@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Phase A Logger</string>
+    <string name="service_label">Phase A Diagnostic Logger</string>
+    <string name="service_description">Observes foreground app and selected Settings screen structure for local diagnostics. Does not block apps, change device settings, or send data.</string>
+</resources>
