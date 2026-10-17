@@ -1,27 +1,4 @@
-// Toolchain (verified compatible per the AGP 8.5 release notes):
-//   AGP 8.5.2  |  Gradle 8.7 (minimum for AGP 8.5)  |  JDK 17  |  compileSdk 34 (max for AGP 8.5)
-//   SDK Build Tools 34.0.0 (AGP 8.5 default)
-// Gradle 8.7 is pinned in .github/workflows/build.yml, JDK 17 likewise.
+
 plugins {
-    id 'com.android.application'
-}
-
-android {
-    namespace 'app.phasea.logger'
-    compileSdk 34
-
-    defaultConfig {
-        applicationId 'app.focusguard'
-        minSdk 30
-        targetSdk 33
-        versionCode 2
-        versionName '0.2-phaseB'
-    }
-
-    // No signingConfigs block: the standard Android debug signing configuration is used.
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
+    id 'com.android.application' version '8.5.2' apply false
 }
