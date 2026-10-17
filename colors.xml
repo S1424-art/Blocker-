@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pc_bg">#F3F5F8</color>
+    <color name="pc_surface">#FFFFFF</color>
+    <color name="pc_stroke">#D8DFE6</color>
+    <color name="pc_primary">#16324F</color>
+    <color name="pc_on_primary">#FFFFFF</color>
+    <color name="pc_text">#1B2733</color>
+    <color name="pc_muted">#5B6B7A</color>
+    <color name="pc_ok">#1E7B4F</color>
+    <color name="pc_warn">#B3261E</color>
+    <color name="pc_caution">#8A5A00</color>
+    <color name="ic_launcher_background">#16324F</color>
+</resources>

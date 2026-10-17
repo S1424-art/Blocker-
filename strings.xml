@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Protection Companion</string>
+    <string name="service_label">Protection Companion (observer)</string>
+    <string name="service_description">Observes which app and Settings screen is open and keeps a private log on this phone. If you arm Guard for apps you chose, it can send you Home when the App info screen of one of those apps opens. It does not block anything else, change settings, or send data anywhere.</string>
+</resources>
