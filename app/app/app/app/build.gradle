@@ -1,0 +1,22 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'app.phasea.logger'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'app.phasea.logger'
+        minSdk 26
+        targetSdk 33
+        versionCode 1
+        versionName '0.1.0-phaseA'
+    }
+
+    // Use the standard Android debug signing configuration.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
