@@ -69,6 +69,26 @@ jobs:
           find "$PROJECT" -type f -not -path '*/.gradle/*' | sort > app-lock-output/extracted-source-tree.txt
           echo '--- Extracted project tree ---'
           cat app-lock-output/extracted-source-tree.txt
+                - name: Audit device-admin configuration (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT=_app_lock/protection-companion-phase-b
+
+          echo '--- AndroidManifest.xml ---'
+          grep -nE 'testOnly|allowBackup|ProtectionCompanionApp|ProtectionDeviceAdminReceiver|BIND_DEVICE_ADMIN|device_admin' "$PROJECT/app/src/main/AndroidManifest.xml" || true
+
+          echo '--- device_admin.xml ---'
+          cat "$PROJECT/app/src/main/res/xml/device_admin.xml"
+
+          echo '--- ProtectionDeviceAdminReceiver.java ---'
+          sed -n '1,220p' "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionDeviceAdminReceiver.java"
+
+          echo '--- DevicePolicyController.java ---'
+          sed -n '1,260p' "$PROJECT/app/src/main/java/app/phasea/logger/DevicePolicyController.java"
+
+          echo '--- app/build.gradle ---'
+          grep -nE 'versionCode|versionName|applicationId|minSdk|targetSdk|testOnly' "$PROJECT/app/build.gradle" || true
 
       - name: Show toolchain
         run: |
