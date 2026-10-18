@@ -48,7 +48,9 @@ jobs:
           test -s Protection-Companion-Stage1-Redesign.zip
           unzip -t Protection-Companion-Stage1-Redesign.zip
           unzip -q Protection-Companion-Stage1-Redesign.zip -d _app_lock
+
           PROJECT=_app_lock/protection-companion-phase-b
+
           test -f "$PROJECT/settings.gradle"
           test -f "$PROJECT/app/build.gradle"
           test -f "$PROJECT/app/src/main/AndroidManifest.xml"
@@ -61,31 +63,46 @@ jobs:
           test -f "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionCompanionApp.java"
           test -f "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionDeviceAdminReceiver.java"
           test -f "$PROJECT/app/src/main/res/xml/device_admin.xml"
+
           grep -q 'android:name=".ProtectionCompanionApp"' "$PROJECT/app/src/main/AndroidManifest.xml"
           grep -q '0.3.0-alpha02' "$PROJECT/app/build.gradle"
+
           test "$(find "$PROJECT" -name settings.gradle -type f | wc -l)" -eq 1
           test ! -f "$PROJECT/app/src/main/java/app/phasea/logger/GuardActivity.java"
           test ! -f "$PROJECT/app/src/main/java/app/phasea/logger/GuardEngine.java"
-          find "$PROJECT" -type f -not -path '*/.gradle/*' | sort > app-lock-output/extracted-source-tree.txt
+
+          find "$PROJECT" -type f -not -path "*/.gradle/*" | sort > app-lock-output/extracted-source-tree.txt
           echo '--- Extracted project tree ---'
           cat app-lock-output/extracted-source-tree.txt
-                - name: Audit device-admin configuration (read-only)
+
+      - name: Audit device-admin configuration (read-only)
         shell: bash
         run: |
-          set -euo pipefail
           PROJECT=_app_lock/protection-companion-phase-b
 
           echo '--- AndroidManifest.xml ---'
           grep -nE 'testOnly|allowBackup|ProtectionCompanionApp|ProtectionDeviceAdminReceiver|BIND_DEVICE_ADMIN|device_admin' "$PROJECT/app/src/main/AndroidManifest.xml" || true
 
           echo '--- device_admin.xml ---'
-          cat "$PROJECT/app/src/main/res/xml/device_admin.xml"
+          if [ -f "$PROJECT/app/src/main/res/xml/device_admin.xml" ]; then
+            cat "$PROJECT/app/src/main/res/xml/device_admin.xml"
+          else
+            echo 'MISSING: device_admin.xml'
+          fi
 
           echo '--- ProtectionDeviceAdminReceiver.java ---'
-          sed -n '1,220p' "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionDeviceAdminReceiver.java"
+          if [ -f "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionDeviceAdminReceiver.java" ]; then
+            sed -n '1,220p' "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionDeviceAdminReceiver.java"
+          else
+            echo 'MISSING: ProtectionDeviceAdminReceiver.java'
+          fi
 
           echo '--- DevicePolicyController.java ---'
-          sed -n '1,260p' "$PROJECT/app/src/main/java/app/phasea/logger/DevicePolicyController.java"
+          if [ -f "$PROJECT/app/src/main/java/app/phasea/logger/DevicePolicyController.java" ]; then
+            sed -n '1,260p' "$PROJECT/app/src/main/java/app/phasea/logger/DevicePolicyController.java"
+          else
+            echo 'MISSING: DevicePolicyController.java'
+          fi
 
           echo '--- app/build.gradle ---'
           grep -nE 'versionCode|versionName|applicationId|minSdk|targetSdk|testOnly' "$PROJECT/app/build.gradle" || true
@@ -97,27 +114,34 @@ jobs:
 
       - name: Build debug APK
         working-directory: _app_lock/protection-companion-phase-b
-        run: gradle --no-daemon -PsourceRevision="$GITHUB_SHA" assembleDebug
+        run: gradle --no-daemon -PsourceRevision="${GITHUB_SHA}" assembleDebug
 
       - name: Verify APK and expected classes
         shell: bash
         run: |
           set -euo pipefail
+
           APK=_app_lock/protection-companion-phase-b/app/build/outputs/apk/debug/app-debug.apk
+
           test -s "$APK"
           unzip -t "$APK"
           unzip -Z1 "$APK" | grep -qx 'classes.dex'
           unzip -Z1 "$APK" | grep -qx 'AndroidManifest.xml'
+
           for dex in $(unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\.dex$'); do
             unzip -p "$APK" "$dex" | strings
           done | grep -o 'Lapp/phasea/logger/[A-Za-z0-9_$]*;' | sort -u > app-lock-output/apk-classes.txt
+
           for clazz in MainActivity SettingsActivity LoggerService DevicePolicyController AppLockActivity AppLockManager ProtectionCompanionApp; do
             grep -qx "Lapp/phasea/logger/$clazz;" app-lock-output/apk-classes.txt
           done
+
           grep -qx 'Lapp/phasea/logger/ProtectionDeviceAdminReceiver;' app-lock-output/apk-classes.txt
           ! grep -qx 'Lapp/phasea/logger/GuardEngine;' app-lock-output/apk-classes.txt
+
           cp "$APK" app-lock-output/app-debug.apk
           ls -lh app-lock-output/app-debug.apk
+
           echo '--- Classes compiled into the APK ---'
           cat app-lock-output/apk-classes.txt
 
