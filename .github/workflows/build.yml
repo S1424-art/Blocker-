@@ -1,12 +1,11 @@
-
-name: Build Protection Companion Phase B
+name: Build Protection Companion Stage 1
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - 'Protection-Companion-PhaseB-reviewed.zip'
+      - 'Protection-Companion-Stage1-Redesign.zip'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -30,34 +29,78 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Verify source archive
-        run: test -s Protection-Companion-PhaseB-reviewed.zip
-
-      - name: Extract Phase B project
+      - name: Record repository provenance
+        shell: bash
         run: |
-          unzip -q Protection-Companion-PhaseB-reviewed.zip -d _phaseb
-          test -f _phaseb/protection-companion-phase-b/settings.gradle
-          test -f _phaseb/protection-companion-phase-b/app/src/main/AndroidManifest.xml
-          test -f _phaseb/protection-companion-phase-b/app/src/main/java/app/phasea/logger/GuardEngine.java
-          test -f _phaseb/protection-companion-phase-b/app/src/main/java/app/phasea/logger/LoggerService.java
+          set -euo pipefail
+          mkdir -p stage1-output
+          git rev-parse HEAD | tee stage1-output/build-commit.txt
+          git log -1 --oneline | tee stage1-output/build-commit-summary.txt
+          sha256sum Protection-Companion-Stage1-Redesign.zip | tee stage1-output/source-archive-sha256.txt
+          git ls-files | sort > stage1-output/repository-tree.txt
+          echo '--- Repository tree (tracked paths) ---'
+          cat stage1-output/repository-tree.txt
 
-      - name: Build Phase B APK
-        working-directory: _phaseb/protection-companion-phase-b
-        run: gradle --no-daemon assembleDebug
-
-      - name: Verify APK
+      - name: Validate and extract the source archive
+        shell: bash
         run: |
-          APK=_phaseb/protection-companion-phase-b/app/build/outputs/apk/debug/app-debug.apk
+          set -euo pipefail
+          test -s Protection-Companion-Stage1-Redesign.zip
+          unzip -t Protection-Companion-Stage1-Redesign.zip
+          unzip -q Protection-Companion-Stage1-Redesign.zip -d _stage1
+          PROJECT=_stage1/protection-companion-phase-b
+          test -f "$PROJECT/settings.gradle"
+          test -f "$PROJECT/app/build.gradle"
+          test -f "$PROJECT/app/src/main/AndroidManifest.xml"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/MainActivity.java"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/SettingsActivity.java"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/LoggerService.java"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/DevicePolicyController.java"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionDeviceAdminReceiver.java"
+          test -f "$PROJECT/app/src/main/res/xml/device_admin.xml"
+          test "$(find "$PROJECT" -name settings.gradle -type f | wc -l)" -eq 1
+          test ! -f "$PROJECT/app/src/main/java/app/phasea/logger/GuardActivity.java"
+          test ! -f "$PROJECT/app/src/main/java/app/phasea/logger/GuardEngine.java"
+          find "$PROJECT" -type f -not -path '*/.gradle/*' | sort > stage1-output/extracted-source-tree.txt
+          echo '--- Extracted project tree ---'
+          cat stage1-output/extracted-source-tree.txt
+
+      - name: Show toolchain
+        run: |
+          java -version
+          gradle --version
+
+      - name: Build debug APK
+        working-directory: _stage1/protection-companion-phase-b
+        run: gradle --no-daemon -PsourceRevision="$GITHUB_SHA" assembleDebug
+
+      - name: Verify APK and expected classes
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=_stage1/protection-companion-phase-b/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           unzip -t "$APK"
-          unzip -l "$APK" | grep -q 'classes.dex'
-          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
-          ls -lh "$APK"
+          unzip -Z1 "$APK" | grep -qx 'classes.dex'
+          unzip -Z1 "$APK" | grep -qx 'AndroidManifest.xml'
+          for dex in $(unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\.dex$'); do
+            unzip -p "$APK" "$dex" | strings
+          done | grep -o 'Lapp/phasea/logger/[A-Za-z0-9_$]*;' | sort -u > stage1-output/apk-classes.txt
+          grep -qx 'Lapp/phasea/logger/MainActivity;' stage1-output/apk-classes.txt
+          grep -qx 'Lapp/phasea/logger/SettingsActivity;' stage1-output/apk-classes.txt
+          grep -qx 'Lapp/phasea/logger/LoggerService;' stage1-output/apk-classes.txt
+          grep -qx 'Lapp/phasea/logger/DevicePolicyController;' stage1-output/apk-classes.txt
+          grep -qx 'Lapp/phasea/logger/ProtectionDeviceAdminReceiver;' stage1-output/apk-classes.txt
+          ! grep -qx 'Lapp/phasea/logger/GuardEngine;' stage1-output/apk-classes.txt
+          cp "$APK" stage1-output/app-debug.apk
+          ls -lh stage1-output/app-debug.apk
+          echo '--- Classes compiled into the APK ---'
+          cat stage1-output/apk-classes.txt
 
-      - name: Upload Phase B APK
+      - name: Upload APK and provenance
         uses: actions/upload-artifact@v4
         with:
-          name: protection-companion-phaseb-apk
-          path: _phaseb/protection-companion-phase-b/app/build/outputs/apk/debug/app-debug.apk
+          name: protection-companion-stage1-apk
+          path: stage1-output/
           if-no-files-found: error
           retention-days: 14
