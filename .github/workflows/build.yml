@@ -1,3 +1,4 @@
+
 name: Build Protection Companion App Lock Update
 
 on:
@@ -78,10 +79,11 @@ jobs:
       - name: Audit device-admin configuration (read-only)
         shell: bash
         run: |
+          set -euo pipefail
           PROJECT=_app_lock/protection-companion-phase-b
 
-          echo '--- AndroidManifest.xml ---'
-          grep -nE 'testOnly|allowBackup|ProtectionCompanionApp|ProtectionDeviceAdminReceiver|BIND_DEVICE_ADMIN|device_admin' "$PROJECT/app/src/main/AndroidManifest.xml" || true
+          echo '--- AndroidManifest.xml (full) ---'
+          cat "$PROJECT/app/src/main/AndroidManifest.xml"
 
           echo '--- device_admin.xml ---'
           if [ -f "$PROJECT/app/src/main/res/xml/device_admin.xml" ]; then
