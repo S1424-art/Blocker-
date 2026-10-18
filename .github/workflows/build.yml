@@ -1,4 +1,4 @@
-name: Build Protection Companion Stage 1
+name: Build Protection Companion App Lock Update
 
 on:
   workflow_dispatch:
@@ -33,13 +33,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p stage1-output
-          git rev-parse HEAD | tee stage1-output/build-commit.txt
-          git log -1 --oneline | tee stage1-output/build-commit-summary.txt
-          sha256sum Protection-Companion-Stage1-Redesign.zip | tee stage1-output/source-archive-sha256.txt
-          git ls-files | sort > stage1-output/repository-tree.txt
+          mkdir -p app-lock-output
+          git rev-parse HEAD | tee app-lock-output/build-commit.txt
+          git log -1 --oneline | tee app-lock-output/build-commit-summary.txt
+          sha256sum Protection-Companion-Stage1-Redesign.zip | tee app-lock-output/source-archive-sha256.txt
+          git ls-files | sort > app-lock-output/repository-tree.txt
           echo '--- Repository tree (tracked paths) ---'
-          cat stage1-output/repository-tree.txt
+          cat app-lock-output/repository-tree.txt
 
       - name: Validate and extract the source archive
         shell: bash
@@ -47,8 +47,8 @@ jobs:
           set -euo pipefail
           test -s Protection-Companion-Stage1-Redesign.zip
           unzip -t Protection-Companion-Stage1-Redesign.zip
-          unzip -q Protection-Companion-Stage1-Redesign.zip -d _stage1
-          PROJECT=_stage1/protection-companion-phase-b
+          unzip -q Protection-Companion-Stage1-Redesign.zip -d _app_lock
+          PROJECT=_app_lock/protection-companion-phase-b
           test -f "$PROJECT/settings.gradle"
           test -f "$PROJECT/app/build.gradle"
           test -f "$PROJECT/app/src/main/AndroidManifest.xml"
@@ -56,14 +56,19 @@ jobs:
           test -f "$PROJECT/app/src/main/java/app/phasea/logger/SettingsActivity.java"
           test -f "$PROJECT/app/src/main/java/app/phasea/logger/LoggerService.java"
           test -f "$PROJECT/app/src/main/java/app/phasea/logger/DevicePolicyController.java"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/AppLockActivity.java"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/AppLockManager.java"
+          test -f "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionCompanionApp.java"
           test -f "$PROJECT/app/src/main/java/app/phasea/logger/ProtectionDeviceAdminReceiver.java"
           test -f "$PROJECT/app/src/main/res/xml/device_admin.xml"
+          grep -q 'android:name=".ProtectionCompanionApp"' "$PROJECT/app/src/main/AndroidManifest.xml"
+          grep -q '0.3.0-alpha02' "$PROJECT/app/build.gradle"
           test "$(find "$PROJECT" -name settings.gradle -type f | wc -l)" -eq 1
           test ! -f "$PROJECT/app/src/main/java/app/phasea/logger/GuardActivity.java"
           test ! -f "$PROJECT/app/src/main/java/app/phasea/logger/GuardEngine.java"
-          find "$PROJECT" -type f -not -path '*/.gradle/*' | sort > stage1-output/extracted-source-tree.txt
+          find "$PROJECT" -type f -not -path '*/.gradle/*' | sort > app-lock-output/extracted-source-tree.txt
           echo '--- Extracted project tree ---'
-          cat stage1-output/extracted-source-tree.txt
+          cat app-lock-output/extracted-source-tree.txt
 
       - name: Show toolchain
         run: |
@@ -71,36 +76,35 @@ jobs:
           gradle --version
 
       - name: Build debug APK
-        working-directory: _stage1/protection-companion-phase-b
+        working-directory: _app_lock/protection-companion-phase-b
         run: gradle --no-daemon -PsourceRevision="$GITHUB_SHA" assembleDebug
 
       - name: Verify APK and expected classes
         shell: bash
         run: |
           set -euo pipefail
-          APK=_stage1/protection-companion-phase-b/app/build/outputs/apk/debug/app-debug.apk
+          APK=_app_lock/protection-companion-phase-b/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           unzip -t "$APK"
           unzip -Z1 "$APK" | grep -qx 'classes.dex'
           unzip -Z1 "$APK" | grep -qx 'AndroidManifest.xml'
           for dex in $(unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\.dex$'); do
             unzip -p "$APK" "$dex" | strings
-          done | grep -o 'Lapp/phasea/logger/[A-Za-z0-9_$]*;' | sort -u > stage1-output/apk-classes.txt
-          grep -qx 'Lapp/phasea/logger/MainActivity;' stage1-output/apk-classes.txt
-          grep -qx 'Lapp/phasea/logger/SettingsActivity;' stage1-output/apk-classes.txt
-          grep -qx 'Lapp/phasea/logger/LoggerService;' stage1-output/apk-classes.txt
-          grep -qx 'Lapp/phasea/logger/DevicePolicyController;' stage1-output/apk-classes.txt
-          grep -qx 'Lapp/phasea/logger/ProtectionDeviceAdminReceiver;' stage1-output/apk-classes.txt
-          ! grep -qx 'Lapp/phasea/logger/GuardEngine;' stage1-output/apk-classes.txt
-          cp "$APK" stage1-output/app-debug.apk
-          ls -lh stage1-output/app-debug.apk
+          done | grep -o 'Lapp/phasea/logger/[A-Za-z0-9_$]*;' | sort -u > app-lock-output/apk-classes.txt
+          for clazz in MainActivity SettingsActivity LoggerService DevicePolicyController AppLockActivity AppLockManager ProtectionCompanionApp; do
+            grep -qx "Lapp/phasea/logger/$clazz;" app-lock-output/apk-classes.txt
+          done
+          grep -qx 'Lapp/phasea/logger/ProtectionDeviceAdminReceiver;' app-lock-output/apk-classes.txt
+          ! grep -qx 'Lapp/phasea/logger/GuardEngine;' app-lock-output/apk-classes.txt
+          cp "$APK" app-lock-output/app-debug.apk
+          ls -lh app-lock-output/app-debug.apk
           echo '--- Classes compiled into the APK ---'
-          cat stage1-output/apk-classes.txt
+          cat app-lock-output/apk-classes.txt
 
       - name: Upload APK and provenance
         uses: actions/upload-artifact@v4
         with:
-          name: protection-companion-stage1-apk
-          path: stage1-output/
+          name: protection-companion-app-lock-update-apk
+          path: app-lock-output/
           if-no-files-found: error
           retention-days: 14
